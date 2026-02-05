@@ -1,66 +1,64 @@
 /**
- * Generates PDF registers for all sessions happening tomorrow.
+ * Generates PDF registers and updates session statuses to 'Register Created'.
+ * Returns stats for the master report.
  */
 function generateDailyRegisters() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sessionSheet = ss.getSheetByName(CONFIG.SHEET_NAME);
   const bookingSheet = ss.getSheetByName(CONFIG.BOOKINGS_SHEET);
   
-  if (!sessionSheet || !bookingSheet) return;
+  let stats = { registersSent: 0, studentsNotified: 0 };
+  if (!sessionSheet || !bookingSheet) return stats;
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toLocaleDateString();
 
   const lastRow = sessionSheet.getLastRow();
-  const lastCol = sessionSheet.getLastColumn();
-  const fullRange = sessionSheet.getRange(CONFIG.HEADER_ROW, 1, lastRow - (CONFIG.HEADER_ROW - 1), lastCol);
+  const fullRange = sessionSheet.getRange(CONFIG.HEADER_ROW, 1, lastRow - (CONFIG.HEADER_ROW - 1), sessionSheet.getLastColumn());
   const sData = fullRange.getValues();
   const sHeaders = sData.shift();
   
   const col = (name) => sHeaders.indexOf(name);
   const statusIdx = col("Status");
   const regSentIdx = col("registerEmailed");
-  const teacherEmailIdx = col("teacherEmail");
   const dateIdx = col("Date");
   const idIdx = col("sessionID");
 
-  // Fetch Bookings with the new 4th column (Clash Status)
   const bData = bookingSheet.getDataRange().getValues();
   bData.shift(); 
 
-  let sentCount = 0;
-
   sData.forEach((row) => {
     const d = row[dateIdx];
-    const dateMatch = d instanceof Date ? d.toLocaleDateString() === tomorrowStr : d === tomorrowStr;
-    const isReady = dateMatch && row[statusIdx] === "Published" && row[regSentIdx] !== "Sent";
-
-    if (isReady) {
+    const parsedDate = parseBritishDate(d);
+    const dateMatch = parsedDate ? parsedDate.toLocaleDateString() === tomorrowStr : false;
+    
+    // Only generate for tomorrow's Published sessions
+    if (dateMatch && row[statusIdx] === "Published") {
       const sessionId = row[idIdx].toString();
-      
-      // Pull student info and whether they have a clash recorded
       const attendeeData = bData
         .filter(b => b[2].toString() === sessionId)
-        .map(b => ({
-          email: b[1],
-          isClashed: b[3] === "CLASH" // Check the 4th column
-        }));
+        .map(b => ({ email: b[1], isClashed: b[3] === "CLASH" }));
 
       if (attendeeData.length > 0) {
-        const teacherEmail = row[teacherEmailIdx] || CONFIG.ADMIN_EMAIL;
-        const success = createAndSendRegister(row, attendeeData, col, teacherEmail);
-        
-        if (success) {
+        const teacherEmail = row[col("teacherEmail")] || CONFIG.ADMIN_EMAIL;
+        if (createAndSendRegister(row, attendeeData, col, teacherEmail)) {
           row[regSentIdx] = "Sent";
-          sentCount++;
+          row[statusIdx] = "Register Created"; // STATUS UPDATE
+          stats.registersSent++;
         }
+      } else {
+        // If no one signed up, we still close the session
+        row[statusIdx] = "Register Created";
       }
     }
   });
 
-  const statusValues = sData.map(row => [row[regSentIdx]]);
-  sessionSheet.getRange(CONFIG.HEADER_ROW + 1, regSentIdx + 1, sData.length, 1).setValues(statusValues);
+  // Write back the Register Emailed status only (Master Sync handles the main Status write-back)
+  const regSentValues = sData.map(row => [row[regSentIdx]]);
+  sessionSheet.getRange(CONFIG.HEADER_ROW + 1, regSentIdx + 1, sData.length, 1).setValues(regSentValues);
+
+  return stats;
 }
 
 /**
@@ -69,11 +67,9 @@ function generateDailyRegisters() {
 function createAndSendRegister(sessionRow, attendees, colFunc, recipient) {
   try {
     let html = HtmlService.createHtmlOutputFromFile('RegisterTemplate').getContent();
-    
     const formatTime = (t) => (t instanceof Date) ? Utilities.formatDate(t, Session.getScriptTimeZone(), "HH:mm") : t.toString();
-    const displayDate = sessionRow[colFunc("Date")] instanceof Date ? sessionRow[colFunc("Date")].toLocaleDateString('en-GB') : sessionRow[colFunc("Date")];
+    const displayDate = parseBritishDate(sessionRow[colFunc("Date")]).toLocaleDateString('en-GB');
 
-    // Build attendee rows with a visual indicator for clashes
     const attendeeRows = attendees.map(student => `
       <tr>
         <td style="padding: 10px;">
@@ -108,10 +104,6 @@ function createAndSendRegister(sessionRow, attendees, colFunc, recipient) {
       body: `Attached is the register for your revision session tomorrow.`,
       attachments: [blob]
     });
-    
     return true;
-  } catch (e) {
-    console.error(`Error sending register: ${e.message}`);
-    return false;
-  }
+  } catch (e) { return false; }
 }
