@@ -53,11 +53,9 @@ function setupSystemTriggers() {
   const triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(t => ScriptApp.deleteTrigger(t));
   
-  // Master Sync and Register Generation at 10:00 PM
   ScriptApp.newTrigger('masterDailyUpdate')
     .timeBased().everyDays(1).atHour(22).create();
 
-  // Form Submit Triggers for live Sign-ups
   Object.values(CONFIG.FORMS).forEach(id => {
     if (id && id !== "YOUR_Y11_FORM_ID_HERE") {
       ScriptApp.newTrigger('onFormSubmitHandler')
