@@ -1,5 +1,6 @@
 /**
  * HANDLES LIVE FORM SUBMISSIONS
+ * Logs bookings, checks clashes, and sends CHRONOLOGICAL confirmation emails.
  */
 function onFormSubmitHandler(e) {
   const responses = e.response.getItemResponses();
