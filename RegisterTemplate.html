@@ -2,57 +2,27 @@
 <html>
 <head>
   <style>
-    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 20px; }
-    .header { border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px; }
-    .header h1 { margin: 0; color: #2c3e50; font-size: 24px; }
-    .meta-table { width: 100%; margin-bottom: 30px; border-collapse: collapse; }
-    .meta-table td { padding: 8px 0; font-size: 14px; }
-    .label { font-weight: bold; color: #7f8c8d; width: 120px; }
-    .register-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    .register-table th { background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; text-align: left; font-size: 13px; }
-    .register-table td { border: 1px solid #dee2e6; padding: 10px; font-size: 13px; }
-    .footer { margin-top: 40px; font-size: 11px; color: #95a5a6; border-top: 1px solid #eee; padding-top: 10px; }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #999; padding: 10px; text-align: left; }
+    th { background-color: #f2f2f2; font-weight: bold; }
+    .header { border-bottom: 2px solid #333; margin-bottom: 20px; padding-bottom: 10px; }
+    .clash-note { color: #d9534f; font-weight: bold; font-size: 0.8em; }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>Revision Session Register</h1>
+    <h2>Revision Register: {{Subject}}</h2>
+    <p><strong>Topic:</strong> {{Topic}} | <strong>Room:</strong> {{Room}}</p>
   </div>
-
-  <table class="meta-table">
-    <tr>
-      <td class="label">Subject:</td>
-      <td><strong>{{Subject}}</strong></td>
-      <td class="label">Staff:</td>
-      <td>{{Teacher}}</td>
-    </tr>
-    <tr>
-      <td class="label">Topic:</td>
-      <td>{{Topic}}</td>
-      <td class="label">Room:</td>
-      <td><strong>{{Room}}</strong></td>
-    </tr>
-    <tr>
-      <td class="label">Date/Time:</td>
-      <td colspan="3">{{Date}} | {{Time}}</td>
-    </tr>
-  </table>
-
-  <table class="register-table">
+  <table>
     <thead>
-      <tr>
-        <th style="width: 70%;">Student Name / Email</th>
-        <th style="width: 30%; text-align: center;">Attendance Check</th>
-      </tr>
+      <tr><th>Student Email</th><th>Attendance Check</th></tr>
     </thead>
     <tbody>
       {{AttendeeRows}}
     </tbody>
   </table>
-
-  <div class="footer">
-    This register was automatically generated on {{GeneratedDate}}. 
-    Please return any corrections to the Revision Coordinator.
-  </div>
+  <p style="margin-top: 30px; font-size: 0.8em; color: #666;">Generated automatically via the Revision System.</p>
 </body>
 </html>
