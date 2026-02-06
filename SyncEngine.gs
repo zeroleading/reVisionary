@@ -1,6 +1,5 @@
 /**
  * THE MASTER SYNC: Runs at 10 PM.
- * Executes the full automated workflow: Registers -> Statuses -> Cancellations -> Forms.
  */
 function masterDailyUpdate() {
   checkAuth();
@@ -19,7 +18,7 @@ function manualFormSync() {
   
   if (response == ui.Button.YES) {
     rebuildFormsFromSheet(true); 
-    ui.alert('Sync Complete', 'Forms updated and notifications sent where applicable.', ui.ButtonSet.OK);
+    ui.alert('Sync Complete', 'Forms updated and notifications sent.', ui.ButtonSet.OK);
   }
 }
 
@@ -30,7 +29,6 @@ function rebuildFormsFromSheet(handleNotifications) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
   const lastRow = sheet.getLastRow();
-  
   if (lastRow < CONFIG.HEADER_ROW) return;
 
   const fullRange = sheet.getRange(CONFIG.HEADER_ROW, 1, lastRow - (CONFIG.HEADER_ROW - 1), sheet.getLastColumn());
@@ -56,7 +54,7 @@ function rebuildFormsFromSheet(handleNotifications) {
       const sessionDetails = {
         subject: row[col("Subject")],
         topic: row[col("Revision topic")],
-        teacher: row[col("Teacher")], // Added Teacher
+        teacher: row[col("Teacher")],
         date: parseBritishDate(row[col("Date")]).toLocaleDateString('en-GB'),
         time: (row[col("Start")] instanceof Date) ? Utilities.formatDate(row[col("Start")], Session.getScriptTimeZone(), "HH:mm") : row[col("Start")]
       };
@@ -154,7 +152,6 @@ function performCancellationNotifications(sessionId, details) {
         <p style="margin-top: 20px;">Best regards,<br><strong>Assessment Team</strong></p>
       </div>
     `;
-
     try {
       MailApp.sendEmail({ to: email, subject: subject, htmlBody: htmlBody });
       logAudit(email, sessionId, "Cancellation Notified");
