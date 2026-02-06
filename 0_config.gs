@@ -3,8 +3,8 @@
  */
 const CONFIG = {
   FORMS: {
-    "Y11": "1r66B_d72pi34nWioCIMH0ybs_cZZvbYy4ig6d_VYVkM",
-    "Y13": "1woPODf5h-d6J-ATCOfA04f_xkWGQT-EC8lNAYFMyyfo"
+    "Y11": "YOUR_Y11_FORM_ID_HERE",
+    "Y13": "YOUR_Y13_FORM_ID_HERE"
   },
   SHEET_NAME: "sessions",
   BOOKINGS_SHEET: "bookings",
@@ -34,6 +34,9 @@ function onOpen() {
     .addToUi();
 }
 
+/**
+ * Security middleware for admin-level functions.
+ */
 function checkAuth() {
   const user = Session.getEffectiveUser().getEmail();
   if (!CONFIG.AUTHORIZED_USERS.includes(user)) {
@@ -42,14 +45,19 @@ function checkAuth() {
   return true;
 }
 
+/**
+ * Initializes the system triggers.
+ */
 function setupSystemTriggers() {
   checkAuth();
   const triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(t => ScriptApp.deleteTrigger(t));
   
+  // Master Sync and Register Generation at 10:00 PM
   ScriptApp.newTrigger('masterDailyUpdate')
     .timeBased().everyDays(1).atHour(22).create();
 
+  // Form Submit Triggers for live Sign-ups
   Object.values(CONFIG.FORMS).forEach(id => {
     if (id && id !== "YOUR_Y11_FORM_ID_HERE") {
       ScriptApp.newTrigger('onFormSubmitHandler')
