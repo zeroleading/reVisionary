@@ -50,14 +50,14 @@ function onFormSubmitHandler(e) {
             clashedIds.add(id); clashedIds.add(otherId);
             const sortedPair = [id, otherId].sort().join('_');
             if (!clashesFound.includes(sortedPair)) {
-              clashesFound.push(`${s.subject} vs ${sessionMap.get(otherId).subject}`);
+              const otherSession = sessionMap.get(otherId);
+              clashesFound.push(`${s.subject} (${id}) vs ${otherSession.subject} (${otherId})`);
             }
           }
         });
       }
     });
 
-    // Sort CHRONOLOGICALLY based on the sheet serial value
     selectedSessions.sort((a, b) => a.serialStart - b.serialStart);
   }
 
@@ -69,20 +69,64 @@ function onFormSubmitHandler(e) {
 }
 
 function sendConfirmationEmail(email, sessions, clashes, clashedIds, editUrl) {
-  const subject = "Confirmation: Your Revision Schedule";
-  let htmlBody = `<div style="font-family: Arial; line-height: 1.6;"><h3>Your Chronological Schedule:</h3><ul>`;
+  const subject = "Confirmation: Your Revision Session Schedule";
+  
+  let htmlBody = `
+    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+      <p>Hello,</p>
+      <p>Thank you for signing up for your upcoming revision sessions. We have successfully recorded your choices.</p>
+      
+      <h3 style="color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px;">Your Selected Schedule:</h3>
+      <ul style="list-style: none; padding-left: 0;">
+  `;
 
   sessions.forEach(s => {
-    const style = clashedIds.has(s.id) ? 'background: #fff3cd; border-left: 4px solid #ffc107; padding: 5px;' : 'padding: 5px;';
-    htmlBody += `<li style="${style}"><strong>${s.subject}</strong>: ${s.topic}<br><small>${s.dateTime} (ID:${s.id})</small></li>`;
+    const isClashed = clashedIds.has(s.id);
+    const style = isClashed ? 'background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin-bottom: 10px;' : 'padding: 5px; margin-bottom: 5px;';
+    
+    htmlBody += `
+      <li style="${style}">
+        <strong>${s.subject}</strong>: ${s.topic}<br>
+        <span style="font-size: 0.9em; color: #666;">${s.dateTime} (ID: ${s.id})</span>
+        ${isClashed ? '<br><em style="color: #856404; font-size: 0.85em;">Note: Potential overlap detected</em>' : ''}
+      </li>
+    `;
   });
 
-  htmlBody += `</ul><div style="background: #e9ecef; padding: 15px; border-radius: 8px; border: 1px solid #ccc; margin-top: 20px;">
-    <strong>Need to change your sessions?</strong><br>
-    Use your personal link to update your choices: <br>
-    <a href="${editUrl}" style="font-weight: bold; color: #007bff;">Update My Selections</a></div></div>`;
-  
-  MailApp.sendEmail({ to: email, subject: subject, htmlBody: htmlBody });
+  htmlBody += `</ul>`;
+
+  if (clashes.length > 0) {
+    htmlBody += `
+      <div style="margin-top: 25px; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+        <p style="margin-top: 0;"><strong>⚠️ A quick heads-up:</strong></p>
+        <p>We noticed that the following sessions in your list appear to overlap or happen at the same time:</p>
+        <ul style="color: #555;">
+          ${clashes.map(c => `<li>${c}</li>`).join('')}
+        </ul>
+        <p style="margin-bottom: 0; font-size: 0.9em;">You may want to review these dates with your teachers to decide which session to prioritize.</p>
+      </div>
+    `;
+  }
+
+  htmlBody += `
+      <div style="margin-top: 25px; padding: 15px; background-color: #e9ecef; border-radius: 8px; border: 1px solid #ccc;">
+        <strong>Need to change your sessions?</strong><br>
+        You can update your response at any time using your personal edit link: <br>
+        <a href="${editUrl}" style="font-weight: bold; color: #007bff;">Update My Selections</a>
+      </div>
+      <p style="margin-top: 20px;">Best regards,<br><strong>Assessment Team</strong></p>
+    </div>
+  `;
+          
+  try {
+    MailApp.sendEmail({
+      to: email,
+      subject: subject,
+      htmlBody: htmlBody
+    });
+  } catch (e) {
+    console.error(`Email Error: ${e.message}`);
+  }
 }
 
 function logBookings(email, ids, clashedIds, editUrl) {
