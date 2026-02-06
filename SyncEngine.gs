@@ -15,11 +15,11 @@ function masterDailyUpdate() {
 function manualFormSync() {
   checkAuth();
   const ui = SpreadsheetApp.getUi();
-  const response = ui.alert('Manual Sync', 'This will publish "Ready to publish" sessions and refresh forms. Proceed?', ui.ButtonSet.YES_NO);
+  const response = ui.alert('Manual Sync', 'This will publish "Ready to publish" sessions, process any "Cancelled" sessions, and refresh forms. Proceed?', ui.ButtonSet.YES_NO);
   
   if (response == ui.Button.YES) {
-    rebuildFormsFromSheet(false); 
-    ui.alert('Sync Complete', 'Forms updated.', ui.ButtonSet.OK);
+    rebuildFormsFromSheet(true); // CHANGED TO TRUE: Now processes cancellations during manual sync
+    ui.alert('Sync Complete', 'Forms updated and notifications sent where applicable.', ui.ButtonSet.OK);
   }
 }
 
@@ -44,7 +44,6 @@ function rebuildFormsFromSheet(handleNotifications) {
     let status = row[statusIdx];
     const year = row[col("Year group")];
     
-    // Check for lowercase 'p' in status
     if (status === "Ready to publish") {
       status = "Published";
       row[statusIdx] = "Published";
@@ -68,7 +67,6 @@ function rebuildFormsFromSheet(handleNotifications) {
       const displayDate = parsedDate ? parsedDate.toLocaleDateString('en-GB') : "TBC";
       const formatTime = (t) => (t instanceof Date) ? Utilities.formatDate(t, Session.getScriptTimeZone(), "HH:mm") : t.toString();
 
-      // FORMAT: 16/04/2026, 15:30 to 17:30 - topic with Teacher (ID:...)
       const sessionString = `${displayDate}, ${formatTime(row[col("Start")])} to ${formatTime(row[col("End")])} - ${row[col("Revision topic")]} with ${row[col("Teacher")]} (ID:${row[col("sessionID")]})`;
       
       if (!collections[year][subject]) collections[year][subject] = [];
@@ -76,11 +74,9 @@ function rebuildFormsFromSheet(handleNotifications) {
     }
   });
 
-  // Write back status updates
   const statusValues = data.map(row => [row[statusIdx]]);
   sheet.getRange(CONFIG.HEADER_ROW + 1, statusIdx + 1, data.length, 1).setValues(statusValues);
 
-  // Rebuild Forms
   for (let year in collections) {
     if (CONFIG.FORMS[year]) {
       for (let sub in collections[year]) {
@@ -91,9 +87,6 @@ function rebuildFormsFromSheet(handleNotifications) {
   }
 }
 
-/**
- * Rebuilds the Form structure with navigation loops.
- */
 function updateSingleForm(formId, subjectMap) {
   try {
     const form = FormApp.openById(formId);
@@ -114,7 +107,6 @@ function updateSingleForm(formId, subjectMap) {
       const checkboxItem = form.addCheckboxItem().setTitle(`Available ${subject} Sessions`);
       checkboxItem.setChoices(subjectMap[subject].map(s => checkboxItem.createChoice(s.text)));
 
-      // Add navigation loop back to menu or submit
       const loopBackItem = form.addMultipleChoiceItem().setTitle(`Finished with ${subject}?`).setRequired(true);
       loopBackItem.setChoices([
         loopBackItem.createChoice("Select another subject", FormApp.PageNavigationType.RESTART),
@@ -133,15 +125,35 @@ function performCancellationNotifications(sessionId, details) {
   if (!bSheet) return 0;
   const bData = bSheet.getDataRange().getValues();
   bData.shift();
-  const affected = bData.filter(row => row[2].toString() === sessionId);
-  let count = 0;
+  
+  // Filter for unique emails booked for this session
+  const affectedRows = bData.filter(row => row[2].toString() === sessionId);
+  const emailMap = new Map();
+  affectedRows.forEach(row => emailMap.set(row[1], row[4])); // email -> editUrl
 
-  affected.forEach(row => {
-    const body = `Hi,\n\nThe session "${details.subject}: ${details.topic}" on ${details.date} is CANCELLED.\n\nYou can update your choices to pick a replacement using your edit link here: ${row[4]}`;
+  let count = 0;
+  emailMap.forEach((editUrl, email) => {
+    const subject = `CANCELLED: Revision Session - ${details.subject}`;
+    const body = `Hello,\n\n` +
+                 `Please note that the following revision session has been CANCELLED:\n\n` +
+                 `Subject: ${details.subject}\n` +
+                 `Topic: ${details.topic}\n` +
+                 `Date: ${details.date}\n\n` +
+                 `If you would like to choose an alternative session, you can update your choices using your personal link here:\n${editUrl}\n\n` +
+                 `Best regards,\nAssessment Team`;
     try {
-      MailApp.sendEmail(row[1], `CANCELLED: ${details.subject}`, body);
+      MailApp.sendEmail(email, subject, body);
+      logAudit(email, sessionId, "Cancellation Notified");
       count++;
-    } catch (e) {}
+    } catch (e) {
+      console.error(`Failed to notify ${email}: ${e.message}`);
+    }
   });
   return count;
+}
+
+function logAudit(email, sessionId, action) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const audit = ss.getSheetByName(CONFIG.AUDIT_SHEET) || ss.insertSheet(CONFIG.AUDIT_SHEET);
+  audit.appendRow([new Date(), email, sessionId, action]);
 }
