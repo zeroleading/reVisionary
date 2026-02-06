@@ -1,6 +1,5 @@
 /**
  * HANDLES LIVE FORM SUBMISSIONS
- * Logs bookings, checks clashes, and sends CHRONOLOGICAL confirmation emails.
  */
 function onFormSubmitHandler(e) {
   const responses = e.response.getItemResponses();
@@ -9,8 +8,7 @@ function onFormSubmitHandler(e) {
   const selectedSessionIds = [];
   
   responses.forEach(response => {
-    const item = response.getItem();
-    if (item.getType() === FormApp.ItemType.CHECKBOX) {
+    if (response.getItem().getType() === FormApp.ItemType.CHECKBOX) {
       response.getResponse().forEach(ans => {
         const id = extractSessionId(ans);
         if (id) selectedSessionIds.push(id.toString());
@@ -20,7 +18,8 @@ function onFormSubmitHandler(e) {
 
   const clashedIds = new Set();
   const selectedSessions = [];
-  const clashesFound = [];
+  const clashesFoundStrings = [];
+  const reportedPairs = new Set();
 
   if (selectedSessionIds.length > 0) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -34,7 +33,7 @@ function onFormSubmitHandler(e) {
       const id = row[col("sessionID")].toString();
       const formatTime = (t) => (t instanceof Date) ? Utilities.formatDate(t, Session.getScriptTimeZone(), "HH:mm") : t.toString();
       sessionMap.set(id, {
-        id: id, subject: row[col("Subject")], topic: row[col("Revision topic")],
+        id: id, subject: row[col("Subject")], topic: row[col("Revision topic")], teacher: row[col("Teacher")],
         dateTime: `${parseBritishDate(row[col("Date")]).toLocaleDateString('en-GB')} @ ${formatTime(row[col("Start")])}`,
         serialStart: row[col("serialStart")],
         clashes: row[col("Potential clash(es)")] ? row[col("Potential clash(es)")].toString().split(',').map(s => s.trim()) : []
@@ -48,34 +47,32 @@ function onFormSubmitHandler(e) {
         selectedSessionIds.forEach(otherId => {
           if (id !== otherId && s.clashes.includes(otherId)) {
             clashedIds.add(id); clashedIds.add(otherId);
-            const sortedPair = [id, otherId].sort().join('_');
-            if (!clashesFound.includes(sortedPair)) {
-              const otherSession = sessionMap.get(otherId);
-              clashesFound.push(`${s.subject} (${id}) vs ${otherSession.subject} (${otherId})`);
+            const pairKey = [id, otherId].sort().join('_');
+            if (!reportedPairs.has(pairKey)) {
+              const other = sessionMap.get(otherId);
+              clashesFoundStrings.push(`${s.subject} (${id}) vs ${other.subject} (${otherId})`);
+              reportedPairs.add(pairKey);
             }
           }
         });
       }
     });
-
     selectedSessions.sort((a, b) => a.serialStart - b.serialStart);
   }
 
   logBookings(studentEmail, selectedSessionIds, clashedIds, editUrl);
 
   if (selectedSessionIds.length > 0) {
-    sendConfirmationEmail(studentEmail, selectedSessions, clashesFound, clashedIds, editUrl);
+    sendConfirmationEmail(studentEmail, selectedSessions, clashesFoundStrings, clashedIds, editUrl);
   }
 }
 
 function sendConfirmationEmail(email, sessions, clashes, clashedIds, editUrl) {
   const subject = "Confirmation: Your Revision Session Schedule";
-  
   let htmlBody = `
     <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
       <p>Hello,</p>
       <p>Thank you for signing up for your upcoming revision sessions. We have successfully recorded your choices.</p>
-      
       <h3 style="color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px;">Your Selected Schedule:</h3>
       <ul style="list-style: none; padding-left: 0;">
   `;
@@ -83,11 +80,10 @@ function sendConfirmationEmail(email, sessions, clashes, clashedIds, editUrl) {
   sessions.forEach(s => {
     const isClashed = clashedIds.has(s.id);
     const style = isClashed ? 'background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin-bottom: 10px;' : 'padding: 5px; margin-bottom: 5px;';
-    
     htmlBody += `
       <li style="${style}">
-        <strong>${s.subject}</strong>: ${s.topic}<br>
-        <span style="font-size: 0.9em; color: #666;">${s.dateTime} (ID: ${s.id})</span>
+        <strong>${s.subject}</strong>: ${s.topic} with ${s.teacher}<br>
+        <span style="font-size: 0.9em; color: #666;">${s.dateTime} (Ref: ${s.id})</span>
         ${isClashed ? '<br><em style="color: #856404; font-size: 0.85em;">Note: Potential overlap detected</em>' : ''}
       </li>
     `;
@@ -118,15 +114,7 @@ function sendConfirmationEmail(email, sessions, clashes, clashedIds, editUrl) {
     </div>
   `;
           
-  try {
-    MailApp.sendEmail({
-      to: email,
-      subject: subject,
-      htmlBody: htmlBody
-    });
-  } catch (e) {
-    console.error(`Email Error: ${e.message}`);
-  }
+  try { MailApp.sendEmail({ to: email, subject: subject, htmlBody: htmlBody }); } catch (e) { console.error(`Email Error: ${e.message}`); }
 }
 
 function logBookings(email, ids, clashedIds, editUrl) {
@@ -134,10 +122,8 @@ function logBookings(email, ids, clashedIds, editUrl) {
   let sheet = ss.getSheetByName(CONFIG.BOOKINGS_SHEET);
   const data = sheet.getDataRange().getValues();
   for (let i = data.length - 1; i >= 1; i--) { if (data[i][1] === email) sheet.deleteRow(i + 1); }
-
   if (ids.length > 0) {
-    const timestamp = new Date();
-    const rows = ids.map(id => [timestamp, email, id, clashedIds.has(id.toString()) ? "CLASH" : "", editUrl]);
+    const rows = ids.map(id => [new Date(), email, id, clashedIds.has(id.toString()) ? "CLASH" : "", editUrl]);
     sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 5).setValues(rows);
   }
 }
