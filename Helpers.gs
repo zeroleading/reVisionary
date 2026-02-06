@@ -6,7 +6,6 @@ function parseBritishDate(dateInput) {
   if (typeof dateInput !== 'string') return new Date(0);
   const parts = dateInput.split('/');
   if (parts.length === 3) {
-    // Note: JS Months are 0-indexed
     return new Date(parts[2], parts[1] - 1, parts[0]);
   }
   return new Date(dateInput);
