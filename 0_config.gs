@@ -3,19 +3,20 @@
  */
 const CONFIG = {
   FORMS: {
-    "Y11": "YOUR_Y11_FORM_ID_HERE",
-    "Y13": "YOUR_Y13_FORM_ID_HERE"
+    "Y11": "1r66B_d72pi34nWioCIMH0ybs_cZZvbYy4ig6d_VYVkM",
+    "Y13": "1woPODf5h-d6J-ATCOfA04f_xkWGQT-EC8lNAYFMyyfo"
   },
   SHEET_NAME: "sessions",
-  BOOKINGS_SHEET: "Bookings",
-  AUDIT_SHEET: "NotificationAudit",
+  BOOKINGS_SHEET: "bookings",
+  AUDIT_SHEET: "notificationAudit",
   HEADER_ROW: 3,
   ADMIN_EMAIL: Session.getEffectiveUser().getEmail(),
   
   AUTHORIZED_USERS: [
     "jappleton@csg.school",
     "tnayagam@csg.school",
-    "cblack@csg.school"
+    "cblack@csg.school",
+    "jtani@csg.school"
   ]
 };
 
