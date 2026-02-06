@@ -96,6 +96,9 @@ function updateSingleForm(formId, subjectMap) {
     const items = form.getItems();
     items.forEach(item => form.deleteItem(item));
 
+    // DYNAMIC DESCRIPTION: Managing the "Final Schedule" concept
+    form.setDescription("INSTRUCTION FOR UPDATING RESPONSES: This form acts as your final schedule. If you are changing your choices, you must ensure every session you wish to attend is currently ticked. Anything left unticked will be removed (unless the session is now closed for new bookings).");
+
     const sortedSubjects = Object.keys(subjectMap).sort();
     if (sortedSubjects.length === 0) {
       form.addSectionHeaderItem().setTitle("No Sessions Available").setHelpText("Please check back later.");
@@ -107,7 +110,10 @@ function updateSingleForm(formId, subjectMap) {
 
     sortedSubjects.forEach(subject => {
       const section = form.addPageBreakItem().setTitle(subject);
-      const checkboxItem = form.addCheckboxItem().setTitle(`Available ${subject} Sessions`);
+      const checkboxItem = form.addCheckboxItem()
+        .setTitle(`Available ${subject} Sessions`)
+        .setHelpText("Please select all sessions you wish to attend. Ensure previous choices are still ticked if you want to keep them.");
+      
       checkboxItem.setChoices(subjectMap[subject].map(s => checkboxItem.createChoice(s.text)));
 
       const loopBackItem = form.addMultipleChoiceItem().setTitle(`Finished with ${subject}?`).setRequired(true);
@@ -125,7 +131,6 @@ function performCancellationNotifications(sessionId, details) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const bSheet = ss.getSheetByName(CONFIG.BOOKINGS_SHEET);
   if (!bSheet) return 0;
-
   const bData = bSheet.getDataRange().getValues();
   bData.shift();
   
