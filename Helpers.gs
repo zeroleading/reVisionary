@@ -1,27 +1,21 @@
 /**
- * Helper to safely parse "dd/MM/yyyy" strings into Date objects.
+ * Parses dd/MM/yyyy strings or Date objects safely.
  */
 function parseBritishDate(dateInput) {
-  if (dateInput instanceof Date) {
-    return new Date(dateInput); 
+  if (dateInput instanceof Date) return dateInput;
+  if (typeof dateInput !== 'string') return new Date(0);
+  const parts = dateInput.split('/');
+  if (parts.length === 3) {
+    // Note: JS Months are 0-indexed
+    return new Date(parts[2], parts[1] - 1, parts[0]);
   }
-
-  if (typeof dateInput === 'string') {
-    const parts = dateInput.split('/');
-    if (parts.length === 3) {
-      return new Date(parts[2], parts[1] - 1, parts[0]);
-    }
-  }
-
-  console.warn("Could not parse date:", dateInput);
-  return null; 
+  return new Date(dateInput);
 }
 
 /**
- * Extracts sessionID from a form checkbox string using Regex.
- * Example: "Maths - Algebra (25/12, 09:00, ID:101)" -> "101"
+ * Extracts sessionID from a form label e.g., "... (ID:ABC12345)"
  */
-function extractSessionId(itemString) {
-  const match = itemString.match(/ID:(\w+)\)/);
+function extractSessionId(label) {
+  const match = label.match(/ID:([A-Za-z0-9]+)\)$/);
   return match ? match[1] : null;
 }
