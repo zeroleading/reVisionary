@@ -25,7 +25,7 @@ function generateDailyRegisters() {
           stats.registersSent++;
         }
       } else {
-        row[col("Status")] = "Register Created"; // Session happened but was empty
+        row[col("Status")] = "Register Created";
       }
     }
   });
@@ -37,7 +37,6 @@ function generateDailyRegisters() {
 function createAndSendRegister(sessionRow, attendees, colFunc, recipient) {
   try {
     let html = HtmlService.createHtmlOutputFromFile('RegisterTemplate').getContent();
-    const formatTime = (t) => (t instanceof Date) ? Utilities.formatDate(t, Session.getScriptTimeZone(), "HH:mm") : t.toString();
     const attendeeRows = attendees.map(s => `<tr><td>${s.email} ${s.isClashed ? '<span style="color:red">⚠️ CLASH</span>' : ''}</td><td style="border:1px solid #000;width:30px;height:20px;"></td></tr>`).join('');
     
     const replacements = { 
@@ -50,7 +49,7 @@ function createAndSendRegister(sessionRow, attendees, colFunc, recipient) {
 
     const blob = HtmlService.createHtmlOutput(html).getAs('application/pdf');
     blob.setName(`Register_${sessionRow[colFunc("Subject")]}.pdf`);
-    MailApp.sendEmail({ to: recipient, subject: `📋 Register: ${sessionRow[colFunc("Subject")]}`, body: `Please find the register for your tomorrow's session attached.`, attachments: [blob] });
+    MailApp.sendEmail({ to: recipient, subject: `📋 Register: ${sessionRow[colFunc("Subject")]}`, body: `Please find the register for your session tomorrow attached.`, attachments: [blob] });
     return true;
   } catch (e) { return false; }
 }
