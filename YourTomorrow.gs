@@ -6,7 +6,13 @@ function sendStudentTomorrowSummary() {
   const sessionSheet = ss.getSheetByName(CONFIG.SHEET_NAME);
   const bookingSheet = ss.getSheetByName(CONFIG.BOOKINGS_SHEET);
   const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toLocaleDateString('en-GB');
+  
+  // Format date to include day of week: e.g., "Monday, 16/02/2026"
+  const dateOptions = { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' };
+  const tomorrowStr = tomorrow.toLocaleDateString('en-GB', dateOptions);
+  
+  // Use simple date string for comparison
+  const comparisonStr = tomorrow.toLocaleDateString('en-GB');
   
   const sData = sessionSheet.getRange(CONFIG.HEADER_ROW, 1, sessionSheet.getLastRow() - (CONFIG.HEADER_ROW - 1), sessionSheet.getLastColumn()).getValues();
   const sHeaders = sData.shift();
@@ -15,7 +21,7 @@ function sendStudentTomorrowSummary() {
   const tomorrowSessions = new Map();
   sData.forEach(row => {
     const rowDate = parseBritishDate(row[col("Date")]);
-    if (rowDate && rowDate.toLocaleDateString('en-GB') === tomorrowStr) {
+    if (rowDate && rowDate.toLocaleDateString('en-GB') === comparisonStr) {
       const id = row[col("sessionID")].toString();
       const formatTime = (t) => (t instanceof Date) ? Utilities.formatDate(t, Session.getScriptTimeZone(), "HH:mm") : t.toString();
       tomorrowSessions.set(id, { subject: row[col("Subject")], topic: row[col("Revision topic")], teacher: row[col("Teacher")], room: row[col("Room")], time: `${formatTime(row[col("Start")])} to ${formatTime(row[col("End")])}` });
@@ -34,10 +40,17 @@ function sendStudentTomorrowSummary() {
   });
 
   studentMap.forEach((sessions, email) => {
-    let htmlBody = `<div style="font-family: Arial, sans-serif; color: #333;"><p>Hello,</p><p>Summary of your revision sessions for tomorrow, <strong>${tomorrowStr}</strong>:</p><table style="width: 100%; border-collapse: collapse;">`;
+    let htmlBody = `
+      <div style="font-family: Arial, sans-serif; color: #333;">
+        <p>Hello,</p>
+        <p>Summary of your upcoming revision sessions for <strong>${tomorrowStr}</strong>:</p>
+        <table style="width: 100%; border-collapse: collapse;">
+    `;
+    
     sessions.forEach(s => {
       htmlBody += `<tr style="${s.clash ? 'background-color: #fff3cd;' : ''}"><td style="border: 1px solid #ddd; padding: 10px;">${s.time}</td><td style="border: 1px solid #ddd; padding: 10px;"><strong>${s.subject}</strong>: ${s.topic}</td><td style="border: 1px solid #ddd; padding: 10px;">Room: ${s.room} (${s.teacher}) ${s.clash ? '<br><small>⚠️ CLASH</small>' : ''}</td></tr>`;
     });
+    
     htmlBody += `</table><p>Sign-ups are now closed for these sessions. Your place is confirmed.</p>${getEmailSignature()}</div>`;
     try { MailApp.sendEmail({ to: email, subject: `Revision Session(s) booked for ${tomorrowStr}`, htmlBody: htmlBody }); } catch (e) {}
   });
@@ -113,13 +126,15 @@ function forceSendStudentSummary(sessionRow, colFunc, sessionId) {
   const bData = bookingSheet.getDataRange().getValues(); bData.shift();
   
   const formatTime = (t) => (t instanceof Date) ? Utilities.formatDate(t, Session.getScriptTimeZone(), "HH:mm") : t.toString();
+  const dateOptions = { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' };
+  
   const sessionInfo = {
     subject: sessionRow[colFunc("Subject")],
     topic: sessionRow[colFunc("Revision topic")],
     teacher: sessionRow[colFunc("Teacher")],
     room: sessionRow[colFunc("Room")],
     time: `${formatTime(sessionRow[colFunc("Start")])} to ${formatTime(sessionRow[colFunc("End")])}`,
-    date: parseBritishDate(sessionRow[colFunc("Date")]).toLocaleDateString('en-GB')
+    date: parseBritishDate(sessionRow[colFunc("Date")]).toLocaleDateString('en-GB', dateOptions)
   };
 
   bData.filter(row => row[2].toString() === sessionId).forEach(row => {
@@ -129,7 +144,7 @@ function forceSendStudentSummary(sessionRow, colFunc, sessionId) {
     let htmlBody = `
       <div style="font-family: Arial, sans-serif; color: #333;">
         <p>Hello,</p>
-        <p>This is a notification regarding your revision session scheduled for <strong>${sessionInfo.date}</strong>:</p>
+        <p>This is a notification regarding your upcoming revision session scheduled for <strong>${sessionInfo.date}</strong>:</p>
         <table style="width: 100%; border-collapse: collapse;">
           <tr style="${isClash ? 'background-color: #fff3cd;' : ''}">
             <td style="border: 1px solid #ddd; padding: 10px;">${sessionInfo.time}</td>
