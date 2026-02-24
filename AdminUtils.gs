@@ -1,5 +1,6 @@
 /**
  * HANDLES LIVE FORM SUBMISSIONS
+ * Logic: Capture -> Clash Check -> Surgical Log -> Chronological Confirmation.
  */
 function onFormSubmitHandler(e) {
   const responses = e.response.getItemResponses();
@@ -28,6 +29,7 @@ function onFormSubmitHandler(e) {
   data.forEach(row => {
     const id = row[col("sessionID")].toString();
     statusMap.set(id, row[col("Status")]);
+
     const formatTime = (t) => (t instanceof Date) ? Utilities.formatDate(t, Session.getScriptTimeZone(), "HH:mm") : t.toString();
     sessionMap.set(id, {
       id: id, subject: row[col("Subject")], topic: row[col("Revision topic")], teacher: row[col("Teacher")],
@@ -61,6 +63,8 @@ function onFormSubmitHandler(e) {
   });
 
   selectedSessions.sort((a, b) => a.serialStart - b.serialStart);
+
+  // SURGICAL UPDATE: Protects 'Register Created' sessions
   logBookings(studentEmail, selectedSessionIds, clashedIds, editUrl, statusMap);
 
   if (selectedSessionIds.length > 0) {
@@ -92,7 +96,7 @@ function sendConfirmationEmail(email, sessions, clashes, clashedIds, editUrl) {
       <li style="${style}">
         <strong>${s.subject}</strong>: ${s.topic} with ${s.teacher}<br>
         <span style="font-size: 0.9em; color: #666;">${s.dateTime} (Ref: ${s.id})</span>
-        ${isClashed ? '<br><em style="color: #856404; font-size: 0.85em;">Note: Potential overlap detected</em>' : ''}
+        ${isClashed ? '<br><span style="color: #856404; font-size: 0.85em; font-weight: bold;">⚠️ POTENTIAL CLASH</span>' : ''}
       </li>
     `;
   });
@@ -102,8 +106,7 @@ function sendConfirmationEmail(email, sessions, clashes, clashedIds, editUrl) {
   if (clashes.length > 0) {
     htmlBody += `
       <div style="margin-top: 25px; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
-        <p style="margin-top: 0;"><strong>⚠️ Just a heads-up:</strong></p>
-        <p>We noticed the following sessions in your list overlap:</p>
+        <p style="margin-top: 0;"><strong>⚠️ Heads-up on Clashes:</strong></p>
         <ul style="color: #555;">
           ${clashes.map(c => `<li>${c}</li>`).join('')}
         </ul>
@@ -127,11 +130,16 @@ function logBookings(email, ids, clashedIds, editUrl, statusMap) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(CONFIG.BOOKINGS_SHEET);
   const data = sheet.getDataRange().getValues();
+  
+  // Wipe Published bookings only to preserve Locked ones
   for (let i = data.length - 1; i >= 1; i--) { 
     const bookingSessionId = data[i][2].toString();
     const sessionStatus = statusMap.get(bookingSessionId);
-    if (data[i][1] === email && sessionStatus === "Published") sheet.deleteRow(i + 1);
+    if (data[i][1] === email && sessionStatus === "Published") {
+      sheet.deleteRow(i + 1);
+    } 
   }
+
   if (ids.length > 0) {
     const rows = ids.map(id => [new Date(), email, id, clashedIds.has(id.toString()) ? "CLASH" : "", editUrl]);
     sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 5).setValues(rows);
