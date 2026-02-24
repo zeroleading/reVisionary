@@ -31,6 +31,7 @@ function onOpen() {
     .addItem('Sync Forms Now (Manual)', 'manualFormSync')
     .addSeparator()
     .addItem('Preview Specific Register', 'previewRegister')
+    .addItem('Force Notification for Session', 'adminForceSessionNotification') // Added force notification tool
     .addSeparator()
     .addItem('Run Master 10PM Update (Manual)', 'masterDailyUpdate')
     .addSeparator()
