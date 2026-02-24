@@ -1,5 +1,5 @@
 /**
- * GLOBAL CONFIGURATION
+ * GLOBAL CONFIGURATION & WHITELIST
  */
 const CONFIG = {
   FORMS: {
@@ -23,14 +23,14 @@ const CONFIG = {
 };
 
 /**
- * Custom Menu
+ * Creates the Custom Menu.
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('🛡️ Revision Admin')
     .addItem('Sync Forms Now (Manual)', 'manualFormSync')
     .addSeparator()
-    .addItem('Preview Specific Register', 'previewRegister') // Added new preview tool
+    .addItem('Preview Specific Register', 'previewRegister')
     .addSeparator()
     .addItem('Run Master 10PM Update (Manual)', 'masterDailyUpdate')
     .addSeparator()
@@ -39,6 +39,9 @@ function onOpen() {
     .addToUi();
 }
 
+/**
+ * Security Middleware.
+ */
 function checkAuth() {
   const user = Session.getEffectiveUser().getEmail();
   if (!CONFIG.AUTHORIZED_USERS.includes(user)) {
@@ -47,6 +50,9 @@ function checkAuth() {
   return true;
 }
 
+/**
+ * Trigger Initialization.
+ */
 function setupSystemTriggers() {
   checkAuth();
   const triggers = ScriptApp.getProjectTriggers();
