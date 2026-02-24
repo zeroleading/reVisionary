@@ -1,6 +1,5 @@
 /**
  * HANDLES LIVE FORM SUBMISSIONS
- * Logs bookings, checks clashes, and sends CHRONOLOGICAL confirmation emails.
  */
 function onFormSubmitHandler(e) {
   const responses = e.response.getItemResponses();
@@ -24,13 +23,11 @@ function onFormSubmitHandler(e) {
   const col = (name) => headers.indexOf(name);
 
   const sessionMap = new Map();
-  const statusMap = new Map(); // Needed for surgical log logic
+  const statusMap = new Map();
 
   data.forEach(row => {
     const id = row[col("sessionID")].toString();
-    const status = row[col("Status")];
-    statusMap.set(id, status);
-
+    statusMap.set(id, row[col("Status")]);
     const formatTime = (t) => (t instanceof Date) ? Utilities.formatDate(t, Session.getScriptTimeZone(), "HH:mm") : t.toString();
     sessionMap.set(id, {
       id: id, subject: row[col("Subject")], topic: row[col("Revision topic")], teacher: row[col("Teacher")],
@@ -64,8 +61,6 @@ function onFormSubmitHandler(e) {
   });
 
   selectedSessions.sort((a, b) => a.serialStart - b.serialStart);
-
-  // Perform Surgical Booking Update
   logBookings(studentEmail, selectedSessionIds, clashedIds, editUrl, statusMap);
 
   if (selectedSessionIds.length > 0) {
@@ -81,11 +76,12 @@ function sendConfirmationEmail(email, sessions, clashes, clashedIds, editUrl) {
       <p>Thank you for signing up for your upcoming revision sessions. We have successfully recorded your choices.</p>
       
       <div style="background-color: #e7f3ff; border-left: 5px solid #2196F3; padding: 15px; margin: 20px 0;">
-        <p style="margin-top: 0;"><strong>⚠️ Important Note for Future Edits:</strong></p>
-        <p style="margin-bottom: 0; font-size: 0.95em;">If you use the link below to change your choices, please ensure you <strong>re-tick every session</strong> you want to keep. The form acts as your final schedule; anything left unticked will be removed from your list (unless the session is happening tomorrow and already closed for changes).</p>
+        <p style="margin-top: 0;"><strong>ℹ️ A note on managing your schedule:</strong></p>
+        <p>If you use the link below to change your choices, please review all subjects. You must ensure <strong>every session you want to keep is ticked</strong> before you submit.</p>
+        <p style="margin-bottom: 0;"><strong>Don't worry:</strong> Sessions happening today or tomorrow may be hidden from the form because sign-ups have closed, but your place is still held securely if you previously chose it.</p>
       </div>
 
-      <h3 style="color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px;">Your Selected Schedule:</h3>
+      <h3 style="color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px;">Your Personalized Schedule:</h3>
       <ul style="list-style: none; padding-left: 0;">
   `;
 
@@ -106,51 +102,36 @@ function sendConfirmationEmail(email, sessions, clashes, clashedIds, editUrl) {
   if (clashes.length > 0) {
     htmlBody += `
       <div style="margin-top: 25px; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
-        <p style="margin-top: 0;"><strong>⚠️ A quick heads-up:</strong></p>
-        <p>We noticed that the following sessions in your list appear to overlap or happen at the same time:</p>
+        <p style="margin-top: 0;"><strong>⚠️ Just a heads-up:</strong></p>
+        <p>We noticed the following sessions in your list overlap:</p>
         <ul style="color: #555;">
           ${clashes.map(c => `<li>${c}</li>`).join('')}
         </ul>
-        <p style="margin-bottom: 0; font-size: 0.9em;">You may want to review these dates with your teachers to decide which session to prioritize.</p>
       </div>
     `;
   }
 
   htmlBody += `
       <div style="margin-top: 25px; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #ccc; text-align: center;">
-        <p style="margin-top: 0;"><strong>Need to change your sessions?</strong></p>
+        <p style="margin-top: 0;"><strong>Want to update your choices?</strong></p>
         <a href="${editUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Update My Selections</a>
       </div>
-      <p style="margin-top: 20px;">Best regards,<br><strong>Assessment Team</strong></p>
+      ${getEmailSignature()}
     </div>
   `;
           
   try { MailApp.sendEmail({ to: email, subject: subject, htmlBody: htmlBody }); } catch (e) { console.error(`Email Error: ${e.message}`); }
 }
 
-/**
- * Surgical Booking Update:
- * Deletes only 'Published' session bookings for a student. 
- * Preserves 'Register Created' (tomorrow's) bookings because they are hidden from the form.
- */
 function logBookings(email, ids, clashedIds, editUrl, statusMap) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(CONFIG.BOOKINGS_SHEET);
   const data = sheet.getDataRange().getValues();
-  
-  // Identify rows to delete (Only those where session is currently 'Published')
-  // We go backwards to delete safely
   for (let i = data.length - 1; i >= 1; i--) { 
-    const bookingEmail = data[i][1];
     const bookingSessionId = data[i][2].toString();
     const sessionStatus = statusMap.get(bookingSessionId);
-
-    if (bookingEmail === email && sessionStatus === "Published") {
-      sheet.deleteRow(i + 1);
-    } 
+    if (data[i][1] === email && sessionStatus === "Published") sheet.deleteRow(i + 1);
   }
-
-  // Add the new bookings
   if (ids.length > 0) {
     const rows = ids.map(id => [new Date(), email, id, clashedIds.has(id.toString()) ? "CLASH" : "", editUrl]);
     sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 5).setValues(rows);
